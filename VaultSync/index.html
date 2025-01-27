@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>File Manager</title>
+    <style>
+        button.delete-btn {
+            color: white;
+            background-color: red;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        button.delete-btn:hover {
+            background-color: darkred;
+        }
+
+        #fileSizeTotal {
+            margin-top: 10px;
+            font-weight: bold;
+            color: red;
+        }
+
+        #fileList {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        #button.rename-btn {
+            color: white;
+            background-color: blue;
+            border: none;
+            border-radius: 4px;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        #button.rename-btn:hover {
+            background-color: darkblue;
+        }
+
+        #input.rename-input {
+            display: none;
+
+        }
+        
+        #input.rename-input.show {
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 10px;
+
+        }
+
+    </style>
+</head>
+<body>
+    <h1>File Manager</h1>
+    <input type="file" id="fileInput">
+    <button id="uploadButton">Upload</button>
+    <div id="progress"></div>
+    <h2>Uploaded Files</h2>
+    <ul id="fileList"></ul>
+    <div id="fileSizeTotal">Total Size: 0 bytes</div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const uploadButton = document.getElementById('uploadButton');
+        const progress = document.getElementById('progress');
+        const fileList = document.getElementById('fileList');
+        const fileSizeTotal = document.getElementById('fileSizeTotal');
+
+        function fetchFiles() {
+            fetch('/files')
+                .then(response => response.json())
+                .then(files => {
+                    fileList.innerHTML = '';
+                    let totalSize = 0;
+
+                    files.forEach(file => {
+                        totalSize += file.size;
+
+                        const li = document.createElement('li');
+                        li.textContent = `${file.name} - ${file.size} bytes`;
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Delete';
+                        deleteBtn.className = 'delete-btn';
+                        deleteBtn.onclick = () => deleteFile(file.name);
+
+                        const renameBtn = document.createElement('button');
+                        renameBtn.textContent = 'Rename';
+                        renameBtn.className = 'rename-btn';
+                        renameBtn.onclick = () => renameFile(file.name);
+                        
+                        const renameInput = document.createElement('input');
+                        renameInput.type = 'text';
+                        renameInput.value = file.name;
+                        renameInput.className = 'rename-input';
+                        renameInput.style.display = 'none';
+
+                        renameBtn.addEventListener('click', () => {
+                            renameBtn.style.display = 'none';
+                            deleteBtn.style.display = 'none';
+                            renameInput.style.display = 'block';
+
+                            const newFileName = renameInput.value;
+                            renameInput.addEventListener('blur', () => {
+                                renameFile(file.name, newFileName);
+                                renameBtn.style.display = 'block';
+                                deleteBtn.style.display = 'block';
+                                renameInput.style.display = 'none';
+                            });
+                        });
+
+                        li.appendChild(renameInput);
+                        li.appendChild(renameBtn);
+                        li.appendChild(deleteBtn);
+                        fileList.appendChild(li);
+                    });
+
+                    fileSizeTotal.textContent = `Total Size: ${totalSize} bytes`;
+                });
+        }
+
+       
+        function renameFile(oldName, newName) {
+            fetch(`/rename/${oldName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+
+                body: JSON.stringify({ newName })
+            }).then(() => fetchFiles())
+                .catch(err => console.error(err));
+        }
+
+        
+
+        function deleteFile(fileName) {
+            fetch(`/delete/${fileName}`, { method: 'POST' })
+                .then(() => fetchFiles())
+                .catch(err => console.error(err));
+        }
+
+        uploadButton.onclick = () => {
+            const file = fileInput.files[0];
+            if (!file) {
+                progress.textContent = 'No file selected!';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                fetch('/upload', {
+                    method: 'POST',
+                    body: reader.result
+                }).then(() => {
+                    progress.textContent = 'File uploaded successfully!';
+                    fetchFiles();
+                }).catch(err => {
+                    progress.textContent = 'Failed to upload file.';
+                    console.error(err);
+                });
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+
+        
+
+        fetchFiles();
+    </script>
+</body>
+</html>
